@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カジノ ブラックジャック - ラファエル vs レンちゃん</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Zen+Maru+Gothic:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Zen Maru Gothic', sans-serif;
+            background-color: #0d1b1e;
+            background-image: radial-gradient(circle at center, #1b3a4b 0%, #0a1118 100%);
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .felt-table {
+            background: radial-gradient(ellipse at center, #0f5132 0%, #06321d 70%, #031c10 100%);
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 20px 40px rgba(0,0,0,0.6);
+            border: 16px solid #3c2415;
+        }
+        .card {
+            transition: transform 0.4s ease, box-shadow 0.4s ease;
+            transform-style: preserve-3d;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.4);
+        }
+        .chip {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.4);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.6); }
+            50% { box-shadow: 0 0 30px rgba(234, 179, 8, 0.9); }
+        }
+        .dealer-turn-glow {
+            animation: pulse-glow 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4 md:p-6">
+
+    <!-- Header Navigation -->
+    <header class="w-full max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center bg-black/40 backdrop-blur-md px-6 py-4 rounded-2xl border border-yellow-600/30 shadow-xl mb-4">
+        <div class="flex items-center space-x-3 mb-2 sm:mb-0">
+            <span class="text-2xl">♠️</span>
+            <h1 class="text-xl md:text-2xl font-black tracking-wider text-yellow-400">CASINO BLACKJACK</h1>
+            <span class="text-2xl">♦️</span>
+        </div>
+        <div class="flex items-center space-x-4 text-lg font-bold">
+            <div class="bg-black/60 px-4 py-2 rounded-xl border border-yellow-500/30 flex items-center space-x-2">
+                <span class="text-yellow-400">レンちゃんの所持金:</span>
+                <span id="player-chips" class="text-emerald-400">$1,000</span>
+            </div>
+            <button onclick="openGallery()" class="bg-yellow-600 hover:bg-yellow-500 text-gray-950 font-black px-3 py-2 rounded-xl text-xs transition shadow-md">
+                ギャラリー (<span id="unlocked-count">0</span>/3)
+            </button>
+            <button onclick="confirmResetData()" class="bg-red-900/80 hover:bg-red-800 text-red-200 border border-red-500/50 font-bold px-2.5 py-2 rounded-xl text-xs transition shadow-md" title="セーブデータを消去して初期化">
+                データ消去
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Game Table -->
+    <main class="w-full max-w-5xl mx-auto flex-1 flex flex-col justify-between felt-table rounded-3xl p-6 md:p-10 relative my-2">
+        
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
+            <div class="text-9xl font-black tracking-widest text-yellow-500">BLACKJACK</div>
+        </div>
+
+        <div id="dealer-section" class="flex flex-col items-center z-10 transition-all duration-300">
+            <div class="flex items-center space-x-3 mb-2 bg-black/50 px-4 py-1.5 rounded-full border border-yellow-500/40">
+                <img src="ラファエル.jpg" alt="ラファエル" class="w-10 h-10 rounded-full object-cover border-2 border-yellow-400 shadow-md" onerror="this.src='https://placehold.co/100x100/1e293b/facc15?text=R'">
+                <div class="flex flex-col">
+                    <span class="text-xs text-yellow-300 font-semibold">ディーラー</span>
+                    <span class="text-sm font-bold text-white">ラファエル (合計: <span id="dealer-score">0</span>)</span>
+                </div>
+            </div>
+            
+            <div id="raphael-dialogue" class="mb-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-yellow-400/40 text-yellow-200 text-xs md:text-sm font-medium tracking-wide shadow-lg transition-all duration-300 max-w-md text-center">
+                「私の勝負、しっかり受けてもらうわよ。」
+            </div>
+            <div id="dealer-cards" class="flex flex-wrap justify-center gap-3 min-h-[100px] items-center">
+            </div>
+        </div>
+
+        <div class="flex flex-col items-center justify-center my-4 z-10">
+            <div id="message-box" class="bg-black/70 backdrop-blur-md px-6 py-3 rounded-2xl border border-yellow-500/50 text-yellow-300 font-bold text-base md:text-lg shadow-2xl text-center mb-4 transition-all duration-300">
+                ベット額を選択して「ディール」を押してください
+            </div>
+
+            <!-- Betting Controls (Always accessible before each round) -->
+            <div id="betting-controls" class="flex flex-col items-center space-y-3">
+                <div class="flex items-center space-x-3 bg-black/40 px-4 py-1.5 rounded-xl border border-yellow-500/30">
+                    <span class="text-sm font-semibold text-yellow-200">現在のベット額: $<span id="current-bet" class="text-emerald-300 text-base font-bold">50</span></span>
+                </div>
+                <div class="flex flex-wrap justify-center gap-2">
+                    <button onclick="addBet(10)" class="chip bg-red-600 hover:bg-red-500 text-white w-12 h-12 rounded-full font-bold text-sm border-4 border-dashed border-white/80 transition transform hover:scale-105 active:scale-95">+$10</button>
+                    <button onclick="addBet(50)" class="chip bg-blue-600 hover:bg-blue-500 text-white w-12 h-12 rounded-full font-bold text-sm border-4 border-dashed border-white/80 transition transform hover:scale-105 active:scale-95">+$50</button>
+                    <button onclick="addBet(100)" class="chip bg-emerald-600 hover:bg-emerald-500 text-white w-12 h-12 rounded-full font-bold text-sm border-4 border-dashed border-white/80 transition transform hover:scale-105 active:scale-95">+$100</button>
+                    <button onclick="addBet(500)" class="chip bg-purple-600 hover:bg-purple-500 text-white w-12 h-12 rounded-full font-bold text-sm border-4 border-dashed border-white/80 transition transform hover:scale-105 active:scale-95">+$500</button>
+                    <button onclick="clearBet()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-xl text-xs font-bold transition">リセット</button>
+                </div>
+            </div>
+
+            <!-- Gameplay Action Controls -->
+            <div id="action-controls" class="hidden flex flex-wrap justify-center gap-3">
+                <button onclick="playerHit()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition transform hover:scale-105 active:scale-95 border border-emerald-400">ヒット (Hit)</button>
+                <button onclick="playerStand()" class="bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition transform hover:scale-105 active:scale-95 border border-amber-400">スタンド (Stand)</button>
+                <button id="double-btn" onclick="playerDouble()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg transition transform hover:scale-105 active:scale-95 border border-indigo-400">ダブル (Double)</button>
+            </div>
+
+            <!-- Start Deal Button -->
+            <div id="deal-start-btn" class="mt-4">
+                <button onclick="startRound()" class="bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-gray-900 px-10 py-3 rounded-xl font-black text-lg shadow-xl transition transform hover:scale-105 active:scale-95 border border-yellow-300">ディール (Deal)</button>
+            </div>
+        </div>
+
+        <div id="player-section" class="flex flex-col items-center z-10 transition-all duration-300">
+            <div id="player-cards" class="flex flex-wrap justify-center gap-3 min-h-[100px] items-center mb-2">
+            </div>
+            <div class="flex items-center space-x-3 bg-black/50 px-4 py-1.5 rounded-full border border-yellow-500/40">
+                <img src="レン.jpg" alt="レンちゃん" class="w-10 h-10 rounded-full object-cover border-2 border-yellow-400 shadow-md" onerror="this.src='https://placehold.co/100x100/1e293b/facc15?text=R'">
+                <div class="flex flex-col">
+                    <span class="text-xs text-yellow-300 font-semibold">プレイヤー</span>
+                    <span class="text-sm font-bold text-white">レンちゃん (合計: <span id="player-score">0</span>)</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-b from-gray-900 via-gray-950 to-black border-2 border-red-500/60 rounded-3xl p-6 md:p-8 max-w-md w-full text-center shadow-2xl relative">
+            <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-red-950/80 border-2 border-red-500 flex items-center justify-center text-3xl">
+                💸
+            </div>
+            <h2 class="text-2xl md:text-3xl font-black text-red-500 mb-2">GAME OVER</h2>
+            <div class="bg-white/5 p-4 rounded-2xl border border-white/10 mb-6">
+                <p class="text-yellow-200 text-sm md:text-base font-medium mb-1">ラファエル</p>
+                <p id="game-over-dialogue" class="text-gray-300 italic text-sm">「一銭もなくなってしまったわね…また挑戦しに来るといいわ。」</p>
+            </div>
+            <p class="text-gray-400 text-xs md:text-sm mb-6">所持金が$0になりました。初期チップ($1,000)を受け取って再挑戦しますか？</p>
+            <button onclick="resetGame()" class="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-gray-950 font-black py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-base">
+                リトライ ($1,000で再開)
+            </button>
+        </div>
+    </div>
+
+    <!-- Achievement Unlock Modal -->
+    <div id="achievement-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-b from-gray-900 via-gray-950 to-black border-2 border-yellow-500/80 rounded-3xl p-6 md:p-8 max-w-lg w-full text-center shadow-2xl relative">
+            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-gray-950 font-black px-6 py-1.5 rounded-full text-sm shadow-lg border-2 border-yellow-300">
+                🎉 実績達成！新画像解放 🎉
+            </div>
+            <h2 id="achievement-title" class="text-xl md:text-2xl font-black text-yellow-400 mb-2 mt-2">所持金 $2,000 達成！</h2>
+            <p id="achievement-desc" class="text-gray-300 text-xs md:text-sm mb-4">新しい画像がギャラリーに追加されました！</p>
+            <div class="mb-6 flex justify-center">
+                <img id="achievement-img" src="" alt="Unlock" class="max-h-64 rounded-xl border-2 border-yellow-400 shadow-xl object-contain">
+            </div>
+            <button onclick="closeAchievementModal()" class="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-gray-950 font-black py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105 active:scale-95 text-base">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <!-- Gallery Modal -->
+    <div id="gallery-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-b from-gray-900 via-gray-950 to-black border-2 border-yellow-500/60 rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-black text-yellow-400">レンちゃんのギャラリー</h2>
+                <button onclick="closeGallery()" class="text-gray-400 hover:text-white font-bold text-xl px-2">×</button>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">所持金が $2,000 / $5,000 / $10,000 に到達すると、新しい画像が順番に解放されます！</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-y-auto flex-1 p-2">
+                <div class="bg-black/50 p-3 rounded-2xl border border-gray-800 flex flex-col items-center">
+                    <span class="text-xs text-yellow-400 font-bold mb-2">$2,000 達成</span>
+                    <div id="gallery-slot-1" class="w-full h-40 flex items-center justify-center bg-gray-900 rounded-xl border border-dashed border-gray-700 text-xs text-gray-500 text-center p-2">
+                        未開放 ($2,000で解放)
+                    </div>
+                </div>
+                <div class="bg-black/50 p-3 rounded-2xl border border-gray-800 flex flex-col items-center">
+                    <span class="text-xs text-yellow-400 font-bold mb-2">$5,000 達成</span>
+                    <div id="gallery-slot-2" class="w-full h-40 flex items-center justify-center bg-gray-900 rounded-xl border border-dashed border-gray-700 text-xs text-gray-500 text-center p-2">
+                        未開放 ($5,000で解放)
+                    </div>
+                </div>
+                <div class="bg-black/50 p-3 rounded-2xl border border-gray-800 flex flex-col items-center">
+                    <span class="text-xs text-yellow-400 font-bold mb-2">$10,000 達成</span>
+                    <div id="gallery-slot-3" class="w-full h-40 flex items-center justify-center bg-gray-900 rounded-xl border border-dashed border-gray-700 text-xs text-gray-500 text-center p-2">
+                        未開放 ($10,000で解放)
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeGallery()" class="mt-6 w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-2.5 rounded-xl transition">
+                閉じる
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Game State Variables
+        let chips = 1000;
+        let currentBet = 50;
+        let deck = [];
+        let playerHand = [];
+        let dealerHand = [];
+        let gameInProgress = false;
+
+        const SAVE_KEY = 'blackjack_ren_raphael_save_v1';
+
+        // Gallery unlock tracking
+        let unlockedMilestones = {
+            2000: false,
+            5000: false,
+            10000: false
+        };
+
+        const galleryImages = {
+            2000: { src: '1.jpg', title: '所持金 $2,000 達成記念' },
+            5000: { src: '2.jpg', title: '所持金 $5,000 達成記念' },
+            10000: { src: '3.jpg', title: '所持金 $10,000 達成記念' }
+        };
+
+        const suits = ['♠', '♥', '♦', '♣'];
+        const values = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+        // Raphael's dialogue lines
+        const raphaelLines = {
+            start: [
+                "私の勝負、しっかり受けてもらうわよ。",
+                "手加減はしないわ。準備はいいかしら？",
+                "さぁ、ブラックジャックを始めるわね。"
+            ],
+            hitPlayer: [
+                "欲張るのね…バーストしないといいけれど。",
+                "強気ね…この先どう出るのかしら？",
+                "まだ引くつもり？面白いわね。"
+            ],
+            standPlayer: [
+                "そこで止まるのね。賢明な判断かしら？",
+                "私のターンね。見せてあげるわ。",
+                "スタンドね。では、私の番よ。"
+            ],
+            dealerWin: [
+                "私の勝利ね。お疲れ様。",
+                "勝負ありね、レン。もう少し練習が必要かしら？",
+                "私の勝利よ。また挑戦してくるといいわ。"
+            ],
+            playerWin: [
+                "やるじゃない、レン。見事な勝利だわ。",
+                "参ったわね…私の負けよ。おめでとう。",
+                "見事なものね。あなたの勝ちだわ。"
+            ],
+            blackjack: [
+                "驚いたわ…ナチュラルブラックジャックとはね。",
+                "完璧な揃い方ね…恐れ入ったわ。"
+            ],
+            bust: [
+                "自滅ね、もう少し冷静になったほうがいいんじゃないかしら？",
+                "欲張りすぎた結末ね。ドンマイと言っておくわ。"
+            ],
+            gameOver: [
+                "あら、もうチップがなくなってしまったの？出直してくるといいわ。",
+                "一銭もなくなってしまったわね…また挑戦しに来るといいわ。",
+                "全財産を失ってしまうなんて…また挑戦しに来るといいわ。"
+            ]
+        };
+
+        function saveProgress() {
+            const dataToSave = {
+                chips: chips,
+                currentBet: currentBet,
+                unlockedMilestones: unlockedMilestones
+            };
+            try {
+                localStorage.setItem(SAVE_KEY, JSON.stringify(dataToSave));
+            } catch (e) {
+                console.error("Failed to save game data:", e);
+            }
+        }
+
+        function loadProgress() {
+            try {
+                const savedData = localStorage.getItem(SAVE_KEY);
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    if (typeof parsed.chips === 'number') chips = parsed.chips;
+                    if (typeof parsed.currentBet === 'number') currentBet = parsed.currentBet;
+                    if (parsed.unlockedMilestones) {
+                        unlockedMilestones = { ...unlockedMilestones, ...parsed.unlockedMilestones };
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load saved game data:", e);
+            }
+        }
+
+        function confirmResetData() {
+            if (confirm("セーブデータを消去して、最初からやり直しますか？\n（所持金$1,000、ギャラリー解放状態も初期化されます）")) {
+                localStorage.removeItem(SAVE_KEY);
+                chips = 1000;
+                currentBet = 50;
+                unlockedMilestones = { 2000: false, 5000: false, 10000: false };
+                if (gameInProgress) {
+                    gameInProgress = false;
+                    document.getElementById('action-controls').classList.add('hidden');
+                    document.getElementById('betting-controls').classList.remove('hidden');
+                    document.getElementById('deal-start-btn').classList.remove('hidden');
+                    document.getElementById('dealer-cards').innerHTML = '';
+                    document.getElementById('player-cards').innerHTML = '';
+                    document.getElementById('dealer-score').innerText = '0';
+                    document.getElementById('player-score').innerText = '0';
+                }
+                setMessage("セーブデータを初期化しました。ベット額を選択して「ディール」を押してください。");
+                setRaphaelDialogue('start');
+                updateUI();
+                saveProgress();
+            }
+        }
+
+        function setRaphaelDialogue(category) {
+            const lines = raphaelLines[category];
+            const randomLine = lines[Math.floor(Math.random() * lines.length)];
+            const bubble = document.getElementById('raphael-dialogue');
+            bubble.style.opacity = '0';
+            setTimeout(() => {
+                bubble.innerText = `「${randomLine}」`;
+                bubble.style.opacity = '1';
+            }, 150);
+            return randomLine;
+        }
+
+        function updateUI() {
+            document.getElementById('player-chips').innerText = `$${chips.toLocaleString()}`;
+            document.getElementById('current-bet').innerText = currentBet.toLocaleString();
+            
+            // Check milestones
+            checkMilestones();
+            saveProgress();
+        }
+
+        function checkMilestones() {
+            let count = 0;
+            [2000, 5000, 10000].forEach(milestone => {
+                if (chips >= milestone && !unlockedMilestones[milestone]) {
+                    unlockedMilestones[milestone] = true;
+                    showAchievementModal(milestone);
+                }
+                if (unlockedMilestones[milestone]) {
+                    count++;
+                }
+            });
+            document.getElementById('unlocked-count').innerText = count;
+            updateGalleryDisplay();
+        }
+
+        function showAchievementModal(milestone) {
+            const info = galleryImages[milestone];
+            document.getElementById('achievement-title').innerText = `所持金 $${milestone.toLocaleString()} 達成！`;
+            document.getElementById('achievement-img').src = info.src;
+            document.getElementById('achievement-modal').classList.remove('hidden');
+        }
+
+        function closeAchievementModal() {
+            document.getElementById('achievement-modal').classList.add('hidden');
+        }
+
+        function openGallery() {
+            document.getElementById('gallery-modal').classList.remove('hidden');
+        }
+
+        function closeGallery() {
+            document.getElementById('gallery-modal').classList.add('hidden');
+        }
+
+        function updateGalleryDisplay() {
+            const slots = [
+                { milestone: 2000, slotId: 'gallery-slot-1' },
+                { milestone: 5000, slotId: 'gallery-slot-2' },
+                { milestone: 10000, slotId: 'gallery-slot-3' }
+            ];
+
+            slots.forEach(item => {
+                const container = document.getElementById(item.slotId);
+                if (unlockedMilestones[item.milestone]) {
+                    const info = galleryImages[item.milestone];
+                    container.innerHTML = `<img src="${info.src}" alt="${info.title}" class="w-full h-full object-cover rounded-lg shadow-md">`;
+                    container.className = "w-full h-40 flex items-center justify-center bg-gray-900 rounded-xl border border-yellow-500/50 overflow-hidden";
+                } else {
+                    container.innerHTML = `未開放 ($${item.milestone.toLocaleString()}で解放)`;
+                    container.className = "w-full h-40 flex items-center justify-center bg-gray-900 rounded-xl border border-dashed border-gray-700 text-xs text-gray-500 text-center p-2";
+                }
+            });
+        }
+
+        function setMessage(text) {
+            document.getElementById('message-box').innerText = text;
+        }
+
+        // Betting Functions - Can change bets before each round
+        function addBet(amount) {
+            if (gameInProgress) return;
+            if (currentBet + amount > chips) {
+                setMessage("これ以上ベット額を増やせないわよ！");
+                return;
+            }
+            currentBet += amount;
+            updateUI();
+        }
+
+        function clearBet() {
+            if (gameInProgress) return;
+            currentBet = Math.min(50, chips);
+            if (currentBet === 0 && chips > 0) {
+                currentBet = chips;
+            }
+            updateUI();
+        }
+
+        function createDeck() {
+            deck = [];
+            for (let suit of suits) {
+                for (let val of values) {
+                    deck.push({ suit, val });
+                }
+            }
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function calculateHand(hand) {
+            let total = 0;
+            let aces = 0;
+            for (let card of hand) {
+                if (card.val === 'A') {
+                    aces++;
+                    total += 11;
+                } else if (['J', 'Q', 'K'].includes(card.val)) {
+                    total += 10;
+                } else {
+                    total += parseInt(card.val);
+                }
+            }
+            while (total > 21 && aces > 0) {
+                total -= 10;
+                aces--;
+            }
+            return total;
+        }
+
+        function renderCards(hand, elementId, hideSecond = false) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            hand.forEach((card, index) => {
+                const cardDiv = document.createElement('div');
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                
+                if (hideSecond && index === 1) {
+                    cardDiv.className = `card w-16 h-24 md:w-20 md:h-28 bg-gradient-to-br from-indigo-900 to-blue-950 rounded-xl border-2 border-yellow-500/60 shadow-lg flex items-center justify-center text-yellow-400 font-bold text-2xl`;
+                    cardDiv.innerHTML = `?`;
+                } else {
+                    cardDiv.className = `card w-16 h-24 md:w-20 md:h-28 bg-white rounded-xl border border-gray-300 shadow-xl flex flex-col justify-between p-2 text-gray-800 font-bold`;
+                    cardDiv.innerHTML = `
+                        <div class="text-xs md:text-sm ${isRed ? 'text-red-600' : 'text-black'}">${card.val}${card.suit}</div>
+                        <div class="text-xl md:text-2xl self-center ${isRed ? 'text-red-600' : 'text-black'}">${card.suit}</div>
+                        <div class="text-xs md:text-sm self-end ${isRed ? 'text-red-600' : 'text-black'}">${card.val}${card.suit}</div>
+                    `;
+                }
+                container.appendChild(cardDiv);
+            });
+        }
+
+        function startRound() {
+            if (chips <= 0) {
+                showGameOver();
+                return;
+            }
+
+            if (currentBet <= 0) {
+                setMessage("ベット額を設定してください！");
+                return;
+            }
+
+            if (chips < currentBet) {
+                currentBet = chips;
+            }
+
+            chips -= currentBet;
+            updateUI();
+
+            gameInProgress = true;
+            createDeck();
+
+            playerHand = [deck.pop(), deck.pop()];
+            dealerHand = [deck.pop(), deck.pop()];
+
+            // Hide betting controls & deal button during active round
+            document.getElementById('betting-controls').classList.add('hidden');
+            document.getElementById('deal-start-btn').classList.add('hidden');
+            document.getElementById('action-controls').classList.remove('hidden');
+
+            const doubleBtn = document.getElementById('double-btn');
+            if (chips >= currentBet) {
+                doubleBtn.classList.remove('hidden');
+            } else {
+                doubleBtn.classList.add('hidden');
+            }
+
+            renderCards(dealerHand, 'dealer-cards', true);
+            renderCards(playerHand, 'player-cards');
+
+            document.getElementById('dealer-score').innerText = calculateHand([dealerHand[0]]);
+            document.getElementById('player-score').innerText = calculateHand(playerHand);
+
+            document.getElementById('dealer-section').classList.remove('dealer-turn-glow');
+
+            setRaphaelDialogue('start');
+
+            if (calculateHand(playerHand) === 21) {
+                setMessage("✨ ブラックジャックよ！ ✨");
+                setRaphaelDialogue('blackjack');
+                endRound();
+            } else {
+                setMessage("レンのターンね。ヒットかスタンドを選ぶといいわ。");
+            }
+        }
+
+        function playerHit() {
+            if (!gameInProgress) return;
+            playerHand.push(deck.pop());
+            renderCards(playerHand, 'player-cards');
+            const score = calculateHand(playerHand);
+            document.getElementById('player-score').innerText = score;
+
+            setRaphaelDialogue('hitPlayer');
+
+            if (score > 21) {
+                setMessage("バーストね！私の勝ちよ。");
+                setRaphaelDialogue('bust');
+                endRound(true);
+            } else if (score === 21) {
+                playerStand();
+            }
+        }
+
+        function playerDouble() {
+            if (!gameInProgress) return;
+            if (chips < currentBet) return;
+
+            chips -= currentBet;
+            currentBet *= 2;
+            updateUI();
+
+            playerHand.push(deck.pop());
+            renderCards(playerHand, 'player-cards');
+            const score = calculateHand(playerHand);
+            document.getElementById('player-score').innerText = score;
+
+            if (score > 21) {
+                setMessage("ダブルダウンでバーストよ！私の勝ちね。");
+                setRaphaelDialogue('bust');
+                endRound(true);
+            } else {
+                playerStand();
+            }
+        }
+
+        function playerStand() {
+            if (!gameInProgress) return;
+            document.getElementById('action-controls').classList.add('hidden');
+            document.getElementById('dealer-section').classList.add('dealer-turn-glow');
+            setMessage("私のターンね...");
+            setRaphaelDialogue('standPlayer');
+
+            renderCards(dealerHand, 'dealer-cards', false);
+            document.getElementById('dealer-score').innerText = calculateHand(dealerHand);
+
+            dealerTurn();
+        }
+
+        function dealerTurn() {
+            let dealerScore = calculateHand(dealerHand);
+
+            const dealerInterval = setInterval(() => {
+                if (dealerScore < 17) {
+                    dealerHand.push(deck.pop());
+                    renderCards(dealerHand, 'dealer-cards', false);
+                    dealerScore = calculateHand(dealerHand);
+                    document.getElementById('dealer-score').innerText = dealerScore;
+                } else {
+                    clearInterval(dealerInterval);
+                    determineWinner();
+                }
+            }, 800);
+        }
+
+        function determineWinner() {
+            document.getElementById('dealer-section').classList.remove('dealer-turn-glow');
+            const playerScore = calculateHand(playerHand);
+            const dealerScore = calculateHand(dealerHand);
+
+            let winAmount = currentBet * 2;
+
+            if (dealerScore > 21) {
+                setMessage("私がバーストしてしまったわ…レンの勝利ね！🎉");
+                setRaphaelDialogue('playerWin');
+                chips += winAmount;
+            } else if (playerScore > dealerScore) {
+                setMessage("レンの勝利ね！お見事だわ！🏆");
+                setRaphaelDialogue('playerWin');
+                chips += winAmount;
+            } else if (playerScore < dealerScore) {
+                setMessage("私の勝利ね。お疲れ様。");
+                setRaphaelDialogue('dealerWin');
+            } else {
+                setMessage("引き分けね。");
+                const bubble = document.getElementById('raphael-dialogue');
+                bubble.innerText = "「引き分けね。お互いになかなかの腕前だわ。」";
+                chips += currentBet;
+            }
+
+            updateUI();
+            finishGameCleanup();
+        }
+
+        function endRound(isImmediateLoss = false) {
+            document.getElementById('action-controls').classList.add('hidden');
+            renderCards(dealerHand, 'dealer-cards', false);
+            document.getElementById('dealer-score').innerText = calculateHand(dealerHand);
+
+            if (isImmediateLoss) {
+                setRaphaelDialogue('dealerWin');
+            } else if (calculateHand(playerHand) === 21 && playerHand.length === 2) {
+                let bjPayout = Math.floor(currentBet * 2.5);
+                chips += bjPayout;
+                setMessage("ナチュラルブラックジャックの大勝利ね！💰");
+                setRaphaelDialogue('blackjack');
+            }
+            updateUI();
+            finishGameCleanup();
+        }
+
+        function finishGameCleanup() {
+            gameInProgress = false;
+            document.getElementById('action-controls').classList.add('hidden');
+
+            if (chips <= 0) {
+                setTimeout(() => {
+                    showGameOver();
+                }, 1000);
+            } else {
+                // Adjust bet if current bet exceeds available chips
+                if (chips < currentBet) {
+                    currentBet = chips;
+                } else if (currentBet === 0) {
+                    currentBet = Math.min(50, chips);
+                }
+                updateUI();
+                
+                // Show betting controls and deal button again for the next round
+                document.getElementById('betting-controls').classList.remove('hidden');
+                document.getElementById('deal-start-btn').classList.remove('hidden');
+                setMessage("次のラウンドのベット額を選択して「ディール」を押してください");
+            }
+        }
+
+        function showGameOver() {
+            const lines = raphaelLines.gameOver;
+            const randomLine = lines[Math.floor(Math.random() * lines.length)];
+            document.getElementById('game-over-dialogue').innerText = `「${randomLine}」`;
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        function resetGame() {
+            chips = 1000;
+            currentBet = 50;
+            playerHand = [];
+            dealerHand = [];
+            gameInProgress = false;
+            
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('dealer-cards').innerHTML = '';
+            document.getElementById('player-cards').innerHTML = '';
+            document.getElementById('dealer-score').innerText = '0';
+            document.getElementById('player-score').innerText = '0';
+            
+            document.getElementById('betting-controls').classList.remove('hidden');
+            document.getElementById('deal-start-btn').classList.remove('hidden');
+
+            setMessage("ベット額を選択して「ディール」を押してください");
+            setRaphaelDialogue('start');
+            updateUI();
+        }
+
+        // Initialize UI with saved data
+        loadProgress();
+        updateUI();
+    </script>
+</body>
+</html>
